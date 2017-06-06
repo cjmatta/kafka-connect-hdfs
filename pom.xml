@@ -249,6 +249,29 @@
             </build>
         </profile>
         <profile>
+            <id>mapr51</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <hadoop.version>2.7.0-mapr-1602</hadoop.version>
+                <yarn.version>2.7.0-mapr-1602</yarn.version>
+                <hive.version>1.2.0-mapr-1602</hive.version>
+            </properties>
+            <repositories>
+                <repository>
+                    <id>mapr-releases</id>
+                    <url>http://repository.mapr.com/maven/</url>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                </repository>
+            </repositories>
+        </profile>
+        <profile>
             <id>mapr52</id>
             <activation>
                 <activeByDefault>false</activeByDefault>
