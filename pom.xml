@@ -23,7 +23,7 @@
     <groupId>io.confluent</groupId>
     <artifactId>kafka-connect-hdfs</artifactId>
     <packaging>jar</packaging>
-    <version>3.2.1-mapr</version>
+    <version>3.2.2-SNAPSHOT</version>
     <name>kafka-connect-hdfs</name>
     <organization>
         <name>Confluent, Inc.</name>
@@ -52,13 +52,15 @@
     <properties>
         <confluent.version>3.2.1</confluent.version>
         <kafka.version>0.10.2.1</kafka.version>
+        <confluent.version>3.2.2-SNAPSHOT</confluent.version>
+        <kafka.version>0.10.2.2-SNAPSHOT</kafka.version>
         <junit.version>4.12</junit.version>
         <hadoop.version>2.7.3</hadoop.version>
         <hive.version>1.2.1</hive.version>
         <avro.version>1.7.7</avro.version>
         <parquet.version>1.7.0</parquet.version>
         <commons-io.version>2.4</commons-io.version>
-        <joda.version>1.6.2</joda.version>
+        <joda.version>2.9.7</joda.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <confluent.maven.repo>http://packages.confluent.io/maven/</confluent.maven.repo>
     </properties>
@@ -76,6 +78,7 @@
             <groupId>org.apache.kafka</groupId>
             <artifactId>connect-api</artifactId>
             <version>${kafka.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>io.confluent</groupId>
@@ -177,6 +180,25 @@
                 <configuration>
                     <source>1.7</source>
                     <target>1.7</target>
+                    <compilerArguments>
+                        <Xlint:all/>
+                        <!-- bootstrap class path not set in conjunction with -source 1.7 -->
+                        <Xlint:-options/>
+                        <!-- serializable class ... has no definition of serialVersionUID -->
+                        <Xlint:-serial/>
+                        <!-- bad path element ".../repository/org/apache/derby/derby/10.10.2.0/derbyLocale_*.jar": no such file or directory -->
+                        <Xlint:-path/>
+                        <!--
+                        WALFile.java:[333,16] [deprecation] sync() in Syncable has been deprecated
+                        Apparently SuppressWarnings("deprecation") doesn't cover this on JDK 7
+                        -->
+                        <Xlint:-deprecation/>
+                        <!-- Needed for DataWriter.java because @SuppressWarnings("unchecked") doesn't cover this on JDK 7 -->
+                        <Xlint:-unchecked/>
+                        <Werror/>
+                    </compilerArguments>
+                    <showWarnings>true</showWarnings>
+                    <showDeprecation>false</showDeprecation>
                 </configuration>
             </plugin>
             <plugin>

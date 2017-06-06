@@ -14,6 +14,7 @@
 
 package io.confluent.connect.hdfs;
 
+import io.confluent.kafka.serializers.NonRecordContainer;
 import org.apache.hadoop.fs.Path;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.data.Schema;
@@ -61,6 +62,26 @@ public class HdfsSinkTaskTest extends TestWithMiniDFSCluster {
     assertEquals(21, (long) offsets.get(TOPIC_PARTITION));
     assertTrue(offsets.containsKey(TOPIC_PARTITION2));
     assertEquals(46, (long) offsets.get(TOPIC_PARTITION2));
+
+    task.stop();
+  }
+
+  @Test
+  public void testSinkTaskStartNoCommittedFiles() throws Exception {
+    Map<String, String> props = createProps();
+    HdfsSinkTask task = new HdfsSinkTask();
+
+    task.initialize(context);
+    task.start(props);
+
+    // Even without any files in HDFS, we expect an explicit request to start from the beginning of the topic (which
+    // either exists at offset 0, or offset 0 will be out of range and the consumer will reset to the smallest offset).
+    Map<TopicPartition, Long> offsets = context.offsets();
+    assertEquals(offsets.size(), 2);
+    assertTrue(offsets.containsKey(TOPIC_PARTITION));
+    assertEquals(0, (long) offsets.get(TOPIC_PARTITION));
+    assertTrue(offsets.containsKey(TOPIC_PARTITION2));
+    assertEquals(0, (long) offsets.get(TOPIC_PARTITION2));
 
     task.stop();
   }
@@ -159,6 +180,49 @@ public class HdfsSinkTaskTest extends TestWithMiniDFSCluster {
     }
   }
 
+  @Test
+  public void testSinkTaskPutPrimitive() throws Exception {
+    Map<String, String> props = createProps();
+    HdfsSinkTask task = new HdfsSinkTask();
+
+    final String key = "key";
+    final Schema schema = Schema.INT32_SCHEMA;
+    final int record = 12;
+    Collection<SinkRecord> sinkRecords = new ArrayList<>();
+    for (TopicPartition tp: assignment) {
+      for (long offset = 0; offset < 7; offset++) {
+        SinkRecord sinkRecord =
+                new SinkRecord(tp.topic(), tp.partition(), Schema.STRING_SCHEMA, key, schema, record, offset);
+        sinkRecords.add(sinkRecord);
+      }
+    }
+    task.initialize(context);
+    task.start(props);
+    task.put(sinkRecords);
+    task.stop();
+
+    AvroData avroData = task.getAvroData();
+    // Last file (offset 6) doesn't satisfy size requirement and gets discarded on close
+    long[] validOffsets = {-1, 2, 5};
+
+    for (TopicPartition tp : assignment) {
+      String directory = tp.topic() + "/" + "partition=" + String.valueOf(tp.partition());
+      for (int j = 1; j < validOffsets.length; ++j) {
+        long startOffset = validOffsets[j - 1] + 1;
+        long endOffset = validOffsets[j];
+        Path path = new Path(FileUtils.committedFileName(url, topicsDir, directory, tp,
+                startOffset, endOffset, extension,
+                ZERO_PAD_FMT));
+        Collection<Object> records = schemaFileReader.readData(conf, path);
+        long size = endOffset - startOffset + 1;
+        assertEquals(records.size(), size);
+        for (Object avroRecord : records) {
+          assertEquals(avroRecord, record);
+        }
+      }
+    }
+  }
+
   private void createCommittedFiles() throws IOException {
     String file1 = FileUtils.committedFileName(url, topicsDir, DIRECTORY1, TOPIC_PARTITION, 0,
                                                10, extension, ZERO_PAD_FMT);
@@ -174,10 +238,9 @@ public class HdfsSinkTaskTest extends TestWithMiniDFSCluster {
     fs.createNewFile(new Path(file4));
   }
 
-  @SuppressWarnings("unchecked")
   private void createWALs(Map<TopicPartition, List<String>> tempfiles,
                           Map<TopicPartition, List<String>> committedFiles) throws Exception {
-
+    @SuppressWarnings("unchecked")
     Class<? extends Storage> storageClass = (Class<? extends Storage>)
         Class.forName(connectorConfig.getString(HdfsSinkConnectorConfig.STORAGE_CLASS_CONFIG));
     Storage storage = StorageFactory.createStorage(storageClass, conf, url);

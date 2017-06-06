@@ -14,7 +14,6 @@
 
 package io.confluent.connect.hdfs;
 
-import org.apache.kafka.clients.producer.internals.DefaultPartitioner;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
@@ -28,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.confluent.connect.hdfs.partitioner.DailyPartitioner;
+import io.confluent.connect.hdfs.partitioner.DefaultPartitioner;
 import io.confluent.connect.hdfs.partitioner.FieldPartitioner;
 import io.confluent.connect.hdfs.partitioner.HourlyPartitioner;
 import io.confluent.connect.hdfs.partitioner.Partitioner;
@@ -89,10 +89,10 @@ public class HdfsSinkConnectorConfig extends AbstractConfig {
   public static final String HIVE_CONF_DIR_CONFIG = "hive.conf.dir";
   private static final String HIVE_CONF_DIR_DOC = "Hive configuration directory";
   public static final String HIVE_CONF_DIR_DEFAULT = "";
-  private static final String HIVE_CONF_DIR_DISPLAY = "Hive configuration directory";
+  private static final String HIVE_CONF_DIR_DISPLAY = "Hive configuration directory.";
 
   public static final String HIVE_HOME_CONFIG = "hive.home";
-  private static final String HIVE_HOME_DOC = "Hive home directory";
+  private static final String HIVE_HOME_DOC = "Hive home directory.";
   public static final String HIVE_HOME_DEFAULT = "";
   private static final String HIVE_HOME_DISPLAY = "Hive home directory";
 
@@ -203,7 +203,7 @@ public class HdfsSinkConnectorConfig extends AbstractConfig {
       + "``TimeBasedPartitioner``. The format set in this configuration converts the Unix timestamp "
       + "to proper directories strings. For example, if you set "
       + "``path.format='year'=YYYY/'month'=MM/'day'=dd/'hour'=HH/``, the data directories will have"
-      + " the format ``/year=2015/month=12/day=07/hour=15`` ";
+      + " the format ``/year=2015/month=12/day=07/hour=15``.";
   public static final String PATH_FORMAT_DEFAULT = "";
   private static final String PATH_FORMAT_DISPLAY = "Path Format";
 
@@ -243,7 +243,7 @@ public class HdfsSinkConnectorConfig extends AbstractConfig {
   // Internal group
   public static final String STORAGE_CLASS_CONFIG = "storage.class";
   private static final String STORAGE_CLASS_DOC =
-      "The underlying storage layer. The default is HDFS";
+      "The underlying storage layer. The default is HDFS.";
   public static final String STORAGE_CLASS_DEFAULT = "io.confluent.connect.hdfs.storage.HdfsStorage";
   private static final String STORAGE_CLASS_DISPLAY = "Storage Class";
 
@@ -369,11 +369,11 @@ public class HdfsSinkConnectorConfig extends AbstractConfig {
       return new LinkedList<>();
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public boolean visible(String name, Map<String, Object> connectorConfigs) {
       String partitionerName = (String) connectorConfigs.get(PARTITIONER_CLASS_CONFIG);
       try {
+        @SuppressWarnings("unchecked")
         Class<? extends Partitioner> partitioner = (Class<? extends Partitioner>) Class.forName(partitionerName);
         if (classNameEquals(partitionerName, DefaultPartitioner.class)) {
           return false;
@@ -382,7 +382,7 @@ public class HdfsSinkConnectorConfig extends AbstractConfig {
           return name.equals(PARTITION_FIELD_NAME_CONFIG);
         } else if (TimeBasedPartitioner.class.isAssignableFrom(partitioner)) {
           // subclass of TimeBasedPartitioner
-          if (!classNameEquals(partitionerName, DailyPartitioner.class) && !classNameEquals(partitionerName, HourlyPartitioner.class)) {
+          if (classNameEquals(partitionerName, DailyPartitioner.class) || classNameEquals(partitionerName, HourlyPartitioner.class)) {
             return name.equals(LOCALE_CONFIG) || name.equals(TIMEZONE_CONFIG);
           } else {
             return name.equals(PARTITION_DURATION_MS_CONFIG) || name.equals(PATH_FORMAT_CONFIG) || name.equals(LOCALE_CONFIG) || name.equals(TIMEZONE_CONFIG);
@@ -409,6 +409,6 @@ public class HdfsSinkConnectorConfig extends AbstractConfig {
   }
 
   public static void main(String[] args) {
-    System.out.println(config.toRst());
+    System.out.println(config.toEnrichedRst());
   }
 }

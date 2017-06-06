@@ -5,8 +5,8 @@ The HDFS connector allows you to export data from Kafka topics to HDFS files in 
 and integrates with Hive to make data immediately available for querying with HiveQL.
 
 The connector periodically polls data from Kafka and writes them to HDFS. The data from each Kafka
-topic is partitioned by the provided partitioner and divided into chucks. Each chunk of data is
-represented as an HDFS file with topic, kafka partition, start and end offsets of this data chuck
+topic is partitioned by the provided partitioner and divided into chunks. Each chunk of data is
+represented as an HDFS file with topic, kafka partition, start and end offsets of this data chunk
 in the filename. If no partitioner is specified in the configuration, the default partitioner which
 preserves the Kafka partitioning is used. The size of each data chunk is determined by the number of
 records written to HDFS, the time written to HDFS and schema compatibility.
@@ -65,17 +65,26 @@ You should see that the process starts up and logs some messages, and then expor
 to HDFS. Once the connector finishes ingesting data to HDFS, check that the data is available
 in HDFS::
 
-  $ hadoop fs -ls /topics/test_hdfs/partitions=0
+  $ hadoop fs -ls /topics/test_hdfs/partition=0
 
-You should see a file with name ``/topics/t1/partition=0/test_hdfs+0+0000000000+0000000002.avro``
-The file name is encoded as ``topic+kafkaPartition+startOffset+endOoffset.format``.
+You should see a file with name ``/topics/test_hdfs/partition=0/test_hdfs+0+0000000000+0000000002.avro``
+The file name is encoded as ``topic+kafkaPartition+startOffset+endOffset.format``.
 
 You can use ``avro-tools-1.7.7.jar``
-(`<http://mirror.metrocast.net/apache/avro/avro-1.7.7/java/avro-tools-1.7.7.jar>`_)
-to extract the content of the file::
+(available in `Apache mirrors <http://mirror.metrocast.net/apache/avro/avro-1.7.7/java/avro-tools-1.7.7.jar>`_)
+to extract the content of the file. Run ``avro-tools`` directly on Hadoop as::
 
   $ hadoop jar avro-tools-1.7.7.jar tojson \
-  /topics/test_hdfs/partition=0/test_hdfs+0+0000000000+0000000002.avro
+  hdfs://<namenode>/topics/test_hdfs/partition=0/test_hdfs+0+0000000000+0000000002.avro
+
+where "<namenode>" is the HDFS name node hostname.
+
+or, if you experience issues, first copy the avro file from HDFS to the local filesystem and try again with java::
+
+  $ hadoop fs -copyToLocal /topics/test_hdfs/partition=0/test_hdfs+0+0000000000+0000000002.avro \
+  /tmp/test_hdfs+0+0000000000+0000000002.avro
+
+  $ java -jar avro-tools-1.7.7.jar tojson /tmp/test_hdfs+0+0000000000+0000000002.avro
 
 You should see the following output::
 
@@ -152,6 +161,9 @@ specifies the HDFS we are writing data to and you should set this according to y
 The ``flush.size`` specifies the number of records the connector need to write before invoking file
 commits.
 
+.. note:: For HA HDFS deployments you will need to include ``hadoop.conf.dir``, setting it to a directory which includes hdfs-site.xml. Once hdfs-site.xml is in place and ``hadoop.conf.dir`` has been set, ``hdfs.url`` may be set to the namenodes nameservice id. i.e. 'nameservice1' . 
+
+
 Format and Partitioner
 ~~~~~~~~~~~~~~~~~~~~~~
 You need to specify the ``format.class`` and ``partitioner.class`` if you want to write other
@@ -161,7 +173,7 @@ write Parquet format and use hourly partitioner::
   format.class=io.confluent.connect.hdfs.parquet.ParquetFormat
   partitioner.class=io.confluent.connect.hdfs.partitioner.HourlyPartitioner
 
-.. note:: If you want ot use the field partitioner, you need to specify the ``partition.field.name``
+.. note:: If you want to use the field partitioner, you need to specify the ``partition.field.name``
    configuration as well to specify the field name of the record.
 
 Hive Integration
